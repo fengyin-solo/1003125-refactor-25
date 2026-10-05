@@ -1,10 +1,9 @@
 """皮带运输接口：维护运输皮带，覆盖登记失效、停机修复、复机确认等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.exporting import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.belt import BeltService
 
@@ -14,6 +13,9 @@ service = BeltService()
 
 LIST_FIELDS = ["皮带编号", "所属巷道", "运输长度", "带速", "运量", "保护装置", "巡检日期", "皮带状态"]
 STATUSES = ["正常", "保护失效", "撕裂", "已修复"]
+
+# 导出路径要排在 /{entry_id} 之前注册，否则会被按编号取单条的路由接走
+register_export(router, service=service, fields=LIST_FIELDS)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -56,10 +58,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出皮带运输清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "belt", "total": total, "items": items}

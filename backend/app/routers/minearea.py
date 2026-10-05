@@ -1,10 +1,9 @@
 """矿区台账接口：维护矿区，覆盖停产整顿、恢复生产、闭坑登记等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.exporting import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.minearea import MineareaService
 
@@ -14,6 +13,9 @@ service = MineareaService()
 
 LIST_FIELDS = ["矿区编号", "矿区名称", "开采矿种", "核定产能", "开采方式", "服务年限", "安全等级", "矿区状态"]
 STATUSES = ["正常生产", "停产整顿", "检修中", "已闭坑"]
+
+# 导出路径要排在 /{entry_id} 之前注册，否则会被按编号取单条的路由接走
+register_export(router, service=service, fields=LIST_FIELDS)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -56,10 +58,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出矿区台账清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "minearea", "total": total, "items": items}

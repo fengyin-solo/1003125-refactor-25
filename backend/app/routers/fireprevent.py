@@ -1,10 +1,9 @@
 """防灭火接口：维护防火监测，覆盖指标预警、高温报警、处置确认等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.exporting import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.fireprevent import FirepreventService
 
@@ -14,6 +13,9 @@ service = FirepreventService()
 
 LIST_FIELDS = ["监测编号", "所在区域", "束管监测", "标志气体", "温度异常", "注浆量", "注氮量", "防火状态"]
 STATUSES = ["正常", "指标异常", "高温预警", "已处置"]
+
+# 导出路径要排在 /{entry_id} 之前注册，否则会被按编号取单条的路由接走
+register_export(router, service=service, fields=LIST_FIELDS)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -56,10 +58,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出防灭火清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "fireprevent", "total": total, "items": items}

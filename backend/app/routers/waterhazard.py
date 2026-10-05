@@ -1,10 +1,9 @@
 """水害防治接口：维护水文监测，覆盖增加监测、突水预警、控制确认等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.exporting import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.waterhazard import WaterhazardService
 
@@ -14,6 +13,9 @@ service = WaterhazardService()
 
 LIST_FIELDS = ["监测编号", "所在区域", "涌水量", "水压", "水温", "水质类型", "排水能力", "水害状态"]
 STATUSES = ["正常", "涌水增加", "突水危险", "已控制"]
+
+# 导出路径要排在 /{entry_id} 之前注册，否则会被按编号取单条的路由接走
+register_export(router, service=service, fields=LIST_FIELDS)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -56,10 +58,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出水害防治清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "waterhazard", "total": total, "items": items}

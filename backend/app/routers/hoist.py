@@ -1,10 +1,9 @@
 """提升系统接口：维护提升机，覆盖磨损预警、制动检修、探伤检测等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.exporting import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.hoist import HoistService
 
@@ -14,6 +13,9 @@ service = HoistService()
 
 LIST_FIELDS = ["提升机编号", "提升类型", "提升高度", "额定载荷", "钢丝绳直径", "上次探伤", "制动系统", "提升状态"]
 STATUSES = ["正常", "钢丝绳磨损", "制动异常", "检修中"]
+
+# 导出路径要排在 /{entry_id} 之前注册，否则会被按编号取单条的路由接走
+register_export(router, service=service, fields=LIST_FIELDS)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -56,10 +58,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出提升系统清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "hoist", "total": total, "items": items}

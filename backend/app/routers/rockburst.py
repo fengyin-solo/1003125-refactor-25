@@ -1,10 +1,9 @@
 """冲击地压接口：维护微震监测，覆盖应力预警、解危处置、解危确认等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.exporting import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.rockburst import RockburstService
 
@@ -14,6 +13,9 @@ service = RockburstService()
 
 LIST_FIELDS = ["监测编号", "所在区域", "微震能量", "微震频次", "应力值", "预警等级", "处置措施", "监测状态"]
 STATUSES = ["正常", "应力集中", "预警", "已解危"]
+
+# 导出路径要排在 /{entry_id} 之前注册，否则会被按编号取单条的路由接走
+register_export(router, service=service, fields=LIST_FIELDS)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -56,10 +58,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出冲击地压清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "rockburst", "total": total, "items": items}
