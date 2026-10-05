@@ -1,10 +1,9 @@
 """通风系统接口：维护通风设备，覆盖降频运行、故障停机、办理更换等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.routers.export import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.ventilation import VentilationService
 
@@ -14,6 +13,16 @@ service = VentilationService()
 
 LIST_FIELDS = ["设备编号", "设备类型", "额定风量", "运行频率", "电流值", "所属巷道", "上次检修", "设备状态"]
 STATUSES = ["正常", "降频运行", "故障停机", "已更换"]
+
+# 导出要在单条路由之前注册，否则 /export 会被 /{entry_id} 按编号接走
+register_export(
+    router,
+    module="ventilation",
+    fields=LIST_FIELDS,
+    statuses=STATUSES,
+    list_entries=service.list_entries,
+    keyword_description="按设备编号检索",
+)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -57,9 +66,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
 
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出通风系统清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "ventilation", "total": total, "items": items}

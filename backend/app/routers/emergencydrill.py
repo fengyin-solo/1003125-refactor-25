@@ -1,10 +1,9 @@
 """应急演练接口：维护演练记录，覆盖组织演练、完成演练、复盘总结等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.routers.export import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.emergencydrill import EmergencydrillService
 
@@ -14,6 +13,16 @@ service = EmergencydrillService()
 
 LIST_FIELDS = ["演练编号", "演练主题", "演练区域", "参演人数", "演练日期", "演练评估", "改进措施", "演练状态"]
 STATUSES = ["待组织", "已组织", "已完成", "已复盘"]
+
+# 导出要在单条路由之前注册，否则 /export 会被 /{entry_id} 按编号接走
+register_export(
+    router,
+    module="emergencydrill",
+    fields=LIST_FIELDS,
+    statuses=STATUSES,
+    list_entries=service.list_entries,
+    keyword_description="按演练编号检索",
+)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -57,9 +66,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
 
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出应急演练清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "emergencydrill", "total": total, "items": items}

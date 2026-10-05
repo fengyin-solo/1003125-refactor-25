@@ -66,6 +66,7 @@
 import { onMounted, ref } from 'vue'
 
 import { request } from '@/api/client'
+import { downloadExport } from '@/api/export'
 
 type Row = Record<string, string | number | null>
 
@@ -86,8 +87,13 @@ function resetFilters() {
   void reload()
 }
 
-function exportRows() {
-  window.open(`${ENDPOINT}/export`, '_blank')
+async function exportRows() {
+  errorMessage.value = ''
+  try {
+    await downloadExport(ENDPOINT, filters.value)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '巷道维修清单导出失败'
+  }
 }
 
 function openCreate() {

@@ -1,10 +1,9 @@
 """持证管理接口：维护持证人员，覆盖安排复训、登记过期、注销证书等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.routers.export import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.certificate import CertificateService
 
@@ -14,6 +13,16 @@ service = CertificateService()
 
 LIST_FIELDS = ["人员编号", "姓名", "证书类别", "证书编号", "发证日期", "到期日期", "复训记录", "证书状态"]
 STATUSES = ["持证有效", "即将到期", "已过期", "已注销"]
+
+# 导出要在单条路由之前注册，否则 /export 会被 /{entry_id} 按编号接走
+register_export(
+    router,
+    module="certificate",
+    fields=LIST_FIELDS,
+    statuses=STATUSES,
+    list_entries=service.list_entries,
+    keyword_description="按人员编号检索",
+)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -57,9 +66,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
 
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出持证管理清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "certificate", "total": total, "items": items}

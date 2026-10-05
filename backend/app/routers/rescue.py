@@ -1,10 +1,9 @@
 """应急救援接口：维护救援装备，覆盖登记不足、补充装备、申请报废等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.routers.export import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.rescue import RescueService
 
@@ -14,6 +13,16 @@ service = RescueService()
 
 LIST_FIELDS = ["装备编号", "装备名称", "装备类别", "存放地点", "保有数量", "上次检查", "下次检查日", "装备状态"]
 STATUSES = ["合格可用", "需补充", "已过期", "已报废"]
+
+# 导出要在单条路由之前注册，否则 /export 会被 /{entry_id} 按编号接走
+register_export(
+    router,
+    module="rescue",
+    fields=LIST_FIELDS,
+    statuses=STATUSES,
+    list_entries=service.list_entries,
+    keyword_description="按装备编号检索",
+)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -57,9 +66,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
 
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出应急救援清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "rescue", "total": total, "items": items}

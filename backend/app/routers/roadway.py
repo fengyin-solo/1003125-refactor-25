@@ -1,10 +1,9 @@
 """巷道维修接口：维护维修任务，覆盖派发任务、开始施工、验收竣工等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.routers.export import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.roadway import RoadwayService
 
@@ -14,6 +13,16 @@ service = RoadwayService()
 
 LIST_FIELDS = ["任务编号", "维修巷道", "维修内容", "施工队伍", "开工日期", "竣工日期", "验收人员", "任务状态"]
 STATUSES = ["待派发", "施工中", "待验收", "已竣工"]
+
+# 导出要在单条路由之前注册，否则 /export 会被 /{entry_id} 按编号接走
+register_export(
+    router,
+    module="roadway",
+    fields=LIST_FIELDS,
+    statuses=STATUSES,
+    list_entries=service.list_entries,
+    keyword_description="按任务编号检索",
+)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -57,9 +66,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
 
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出巷道维修清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "roadway", "total": total, "items": items}

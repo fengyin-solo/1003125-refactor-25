@@ -1,10 +1,9 @@
 """爆破管理接口：维护爆破记录，覆盖提交审批、执行爆破、爆后检查等动作。"""
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 
+from app.routers.export import register_export
 from app.schemas import ActionResult, EntryPayload, PageResult
 from app.services.explosive import ExplosiveService
 
@@ -14,6 +13,16 @@ service = ExplosiveService()
 
 LIST_FIELDS = ["爆破编号", "爆破区域", "炸药用量", "雷管用量", "爆破时间", "警戒范围", "爆破人员", "爆破状态"]
 STATUSES = ["待审批", "已审批", "已爆破", "已检查"]
+
+# 导出要在单条路由之前注册，否则 /export 会被 /{entry_id} 按编号接走
+register_export(
+    router,
+    module="explosive",
+    fields=LIST_FIELDS,
+    statuses=STATUSES,
+    list_entries=service.list_entries,
+    keyword_description="按爆破编号检索",
+)
 
 
 @router.get("", response_model=PageResult[dict])
@@ -57,9 +66,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
 
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出爆破管理清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "explosive", "total": total, "items": items}
